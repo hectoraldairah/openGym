@@ -85,6 +85,236 @@ Visit `https://gym.example.com`, create your profile, and add it to your home sc
 > Changing `RP_ID` later invalidates existing passkeys (they were bound to the old hostname).
 > Pick your domain before people register.
 
+### DigitalOcean Droplet with an existing nginx server
+
+This walkthrough assumes you already have an Ubuntu Droplet with nginx running and a domain you
+control. nginx remains the public web server; it sends requests for `gym.example.com` to openGym's
+Docker web container on port `8080`.
+
+#### Step 1: Point a hostname to the Droplet
+
+At your DNS provider, create an `A` record:
+
+```text
+Type:  A
+Name:  gym
+Value: YOUR_DROPLET_IP
+```
+
+This example uses `gym.example.com`. Replace it everywhere below with your real hostname. Wait
+until DNS returns the Droplet's public IP:
+
+```bash
+dig +short gym.example.com
+```
+
+If DigitalOcean manages the domain, follow its
+[DNS record guide](https://docs.digitalocean.com/products/networking/dns/how-to/manage-records/).
+Choose the final hostname before creating any profiles because changing `RP_ID` invalidates all
+passkeys registered under the previous hostname.
+
+#### Step 2: Check the firewall
+
+Attach a [DigitalOcean Cloud Firewall](https://docs.digitalocean.com/products/networking/firewalls/how-to/configure-rules/)
+with these inbound rules:
+
+- SSH (`22`) from your own IP address, when possible
+- HTTP (`80`) from all IPv4 and IPv6 addresses
+- HTTPS (`443`) from all IPv4 and IPv6 addresses
+
+Leave outbound traffic enabled. Do not expose ports `3000` or `8080` publicly; nginx is the only
+public entry point. A DigitalOcean Cloud Firewall is recommended here because Docker-published
+ports can bypass some host-level UFW rules.
+
+#### Step 3: Install Docker and clone openGym
+
+Connect to the Droplet and confirm nginx is healthy:
+
+```bash
+ssh root@YOUR_DROPLET_IP
+nginx -t
+systemctl status nginx
+```
+
+Install Git if needed. Install Docker Engine and the Compose plugin using Docker's
+[official Ubuntu instructions](https://docs.docker.com/engine/install/ubuntu/) if the version
+commands below are not already available.
+
+```bash
+apt update
+apt install -y git
+docker version
+docker compose version
+```
+
+Clone this repository, or replace the URL with your fork to deploy your own changes:
+
+```bash
+git clone https://github.com/DuarteSantos8/gym-app opengym
+cd opengym
+```
+
+For a private fork, configure a GitHub deploy key on the Droplet before cloning it.
+
+#### Step 4: Configure and start openGym
+
+Create the environment file:
+
+```bash
+nano .env
+```
+
+Add the following values. `RP_ID` is the hostname without a scheme, port, or path. `ORIGIN` is the
+complete public origin and must exactly match the address opened in the browser.
+
+```bash
+RP_ID=gym.example.com
+ORIGIN=https://gym.example.com
+RP_NAME=openGym
+WEB_PORT=8080
+SESSION_DAYS=90
+ADMIN_UIDS=
+INVITE_ONLY=0
+```
+
+Leave registration open until the first profile has been created and promoted to admin. Build and
+start the application:
+
+```bash
+docker compose up -d --build
+docker compose ps
+curl http://127.0.0.1:8080/api/health
+```
+
+The health request should return JSON containing `"ok":true`. The initial start downloads the
+exercise media and can take longer than subsequent starts. If a container is unhealthy, inspect
+it with:
+
+```bash
+docker compose logs -f
+```
+
+#### Step 5: Add the nginx reverse proxy
+
+Create a separate nginx server block so existing sites on the Droplet remain unchanged:
+
+```bash
+nano /etc/nginx/sites-available/opengym
+```
+
+Add this configuration:
+
+```nginx
+server {
+    listen 80;
+    listen [::]:80;
+    server_name gym.example.com;
+
+    client_max_body_size 6m;
+
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+Enable the site, test the complete nginx configuration, and reload only after the test succeeds:
+
+```bash
+ln -s /etc/nginx/sites-available/opengym /etc/nginx/sites-enabled/opengym
+nginx -t
+systemctl reload nginx
+```
+
+If the symlink already exists, do not create it again. Verify the HTTP proxy before requesting a
+certificate:
+
+```bash
+curl http://gym.example.com/api/health
+```
+
+#### Step 6: Enable HTTPS with Let's Encrypt
+
+If Certbot is already installed, check it with `certbot --version` and skip its installation. For
+a new installation, Certbot's [official nginx instructions](https://certbot.eff.org/instructions?ws=nginx&os=snap)
+currently recommend its snap package:
+
+```bash
+snap install --classic certbot
+ln -s /snap/bin/certbot /usr/local/bin/certbot
+```
+
+Ask Certbot to obtain a certificate and update this nginx server block:
+
+```bash
+certbot --nginx -d gym.example.com
+nginx -t
+systemctl reload nginx
+certbot renew --dry-run
+```
+
+Choose the redirect option when Certbot offers to redirect HTTP to HTTPS. The renewal dry run
+confirms that automatic certificate renewal is working.
+
+#### Step 7: Verify the public deployment
+
+Run:
+
+```bash
+curl https://gym.example.com/api/health
+```
+
+Then open `https://gym.example.com` in a browser and create the first passkey profile. If passkey
+verification fails, compare the browser address with `RP_ID` and `ORIGIN` in `.env`, then recreate
+the API container after correcting them:
+
+```bash
+docker compose up -d --force-recreate api
+```
+
+#### Step 8: Make the first profile an administrator
+
+Find the profile id after registration:
+
+```bash
+apt install -y jq
+jq -r '.users[] | [.name, .id] | @tsv' data/db.json
+```
+
+Edit `.env`, put that id in `ADMIN_UIDS`, and optionally make future registration invite-only:
+
+```bash
+ADMIN_UIDS=your-user-id
+INVITE_ONLY=1
+```
+
+Apply the configuration and refresh the browser:
+
+```bash
+docker compose up -d --force-recreate api
+```
+
+The **Admin dashboard** link should now appear in Settings. Use it to generate invite codes for
+new profiles.
+
+#### Step 9: Updates and backups
+
+Update a source-built deployment with:
+
+```bash
+cd ~/opengym
+git pull
+docker compose up -d --build
+```
+
+Back up `data/` as described in section 5 and copy the archive off the Droplet. DigitalOcean
+Droplet backups or snapshots are useful as a second recovery layer, not as the only copy.
+
 ## 4. Multiple users
 
 Anyone who can reach the URL can create their own profile — each gets isolated data. That's the
