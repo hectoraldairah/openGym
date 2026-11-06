@@ -94,6 +94,8 @@ export default {
   'Weight ({0})': 'Gewicht ({0})',
   'Add to routine': 'Zur Routine hinzufügen',
   'Remove exercise': 'Übung entfernen',
+  'Remove “{0}” from this workout?': '„{0}“ aus diesem Training entfernen?',
+  'Remove “{0}” and its logged sets from this workout?': '„{0}“ und die protokollierten Sätze aus diesem Training entfernen?',
   'Pick an icon': 'Symbol auswählen',
   // --- day planning / calendar ---
   'Back to weekly plan': 'Zurück zum Wochenplan',

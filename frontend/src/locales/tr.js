@@ -90,6 +90,8 @@ export default {
   'Weight ({0})': 'Ağırlık ({0})',
   'Add to routine': 'Rutine ekle',
   'Remove exercise': 'Egzersizi kaldır',
+  'Remove “{0}” from this workout?': '“{0}” bu antrenmandan kaldırılsın mı?',
+  'Remove “{0}” and its logged sets from this workout?': '“{0}” ve kaydedilen setleri bu antrenmandan kaldırılsın mı?',
   'Pick an icon': 'Bir simge seç',
   'Back to weekly plan': 'Haftalık plana dön',
   '{0} set to rest': '{0} dinlenme olarak ayarlandı',

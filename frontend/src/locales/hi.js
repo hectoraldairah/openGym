@@ -90,6 +90,8 @@ export default {
   'Weight ({0})': 'वज़न ({0})',
   'Add to routine': 'रूटीन में जोड़ें',
   'Remove exercise': 'व्यायाम हटाएँ',
+  'Remove “{0}” from this workout?': 'इस वर्कआउट से “{0}” हटाएँ?',
+  'Remove “{0}” and its logged sets from this workout?': 'इस वर्कआउट से “{0}” और उसके दर्ज किए गए सेट हटाएँ?',
   'Pick an icon': 'आइकन चुनें',
   'Back to weekly plan': 'साप्ताहिक योजना पर वापस',
   '{0} set to rest': '{0} आराम के लिए सेट',

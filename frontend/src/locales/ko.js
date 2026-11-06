@@ -90,6 +90,8 @@ export default {
   'Weight ({0})': '무게 ({0})',
   'Add to routine': '루틴에 추가',
   'Remove exercise': '운동 제거',
+  'Remove “{0}” from this workout?': '이 운동 세션에서 “{0}”을(를) 제거할까요?',
+  'Remove “{0}” and its logged sets from this workout?': '이 운동 세션에서 “{0}” 및 기록된 세트를 제거할까요?',
   'Pick an icon': '아이콘 선택',
   'Back to weekly plan': '주간 계획으로 복귀',
   '{0} set to rest': '{0}을(를) 휴식일로 설정',

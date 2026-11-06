@@ -90,6 +90,8 @@ export default {
   'Weight ({0})': '重量（{0}）',
   'Add to routine': '加入训练日',
   'Remove exercise': '移除动作',
+  'Remove “{0}” from this workout?': '从本次训练中移除“{0}”？',
+  'Remove “{0}” and its logged sets from this workout?': '从本次训练中移除“{0}”及其已记录的组数？',
   'Pick an icon': '选择图标',
   'Back to weekly plan': '恢复每周计划',
   '{0} set to rest': '{0} 已设为休息',

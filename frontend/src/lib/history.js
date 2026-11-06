@@ -235,6 +235,16 @@ export function supersetUnits(items) {
 }
 export function unitOf(units, idx) { return units.find(u => u.includes(idx)) || [idx] }
 
+// Remove only from this session. Keep the selected exercise when an earlier entry
+// disappears; when removing the selection, show its successor (or the final entry).
+export function removeActiveExercise(active, idx) {
+  if (!active || !Number.isInteger(idx) || idx < 0 || idx >= active.entries.length) return
+  active.entries.splice(idx, 1)
+  cleanupSg(active.entries)
+  const cur = active.cur > idx ? active.cur - 1 : active.cur
+  active.cur = Math.max(0, Math.min(cur, active.entries.length - 1))
+}
+
 export function streakWeeks(S) {
   if (!S.workouts.length) return 0
   const weeks = new Set(S.workouts.map(w => weekKey(w.d)))

@@ -90,6 +90,8 @@ export default {
   'Weight ({0})': 'Peso ({0})',
   'Add to routine': 'Añadir a la rutina',
   'Remove exercise': 'Quitar ejercicio',
+  'Remove “{0}” from this workout?': '¿Quitar «{0}» de este entrenamiento?',
+  'Remove “{0}” and its logged sets from this workout?': '¿Quitar «{0}» y sus series registradas de este entrenamiento?',
   'Pick an icon': 'Elige un icono',
   'Back to weekly plan': 'Volver al plan semanal',
   '{0} set to rest': '{0} marcado como descanso',

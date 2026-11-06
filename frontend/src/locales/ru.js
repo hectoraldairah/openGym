@@ -90,6 +90,8 @@ export default {
   'Weight ({0})': 'Вес ({0})',
   'Add to routine': 'Добавить в программу',
   'Remove exercise': 'Убрать упражнение',
+  'Remove “{0}” from this workout?': 'Убрать «{0}» из этой тренировки?',
+  'Remove “{0}” and its logged sets from this workout?': 'Убрать «{0}» и записанные подходы из этой тренировки?',
   'Pick an icon': 'Выбери иконку',
   'Back to weekly plan': 'Вернуться к недельному плану',
   '{0} set to rest': '{0} — теперь день отдыха',

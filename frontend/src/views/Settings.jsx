@@ -144,14 +144,10 @@ export default function Settings() {
 
     {/* ---------- appearance ---------- */}
     <Section title={t('Appearance')} footer={DEMO || MOBILE ? undefined : t('synced with your profile')}>
-      <Row icon="moon" iconTint="var(--indigo)" title={t('Theme')}>
-        <Segmented
-          className="seg-inline"
-          options={[{ value: 'dark', icon: 'moon', label: t('Dark') }, { value: 'light', icon: 'sun', label: t('Light') }]}
-          value={S.theme === 'light' ? 'light' : 'dark'}
-          onChange={v => update(s => { s.theme = v })}
-        />
-      </Row>
+      <SelectRow icon="moon" iconTint="var(--indigo)" title={t('Theme')}
+        options={[{ value: 'dark', label: t('Dark') }, { value: 'light', label: t('Light') }, { value: 'catppuccin', label: 'Catppuccin Mocha' }]}
+        value={['dark', 'light', 'catppuccin'].includes(S.theme) ? S.theme : 'dark'}
+        onChange={v => update(s => { s.theme = v })} />
       {/* Purely how the muscle map is drawn — nothing else in the app reads this. */}
       <Row icon="figureStrength" iconTint="var(--teal)" title={t('Body diagram')}>
         <Segmented
@@ -166,7 +162,9 @@ export default function Settings() {
         <div className="swatches">
           {Object.entries(ACCENTS).map(([k, c]) => (
             <button key={k} className={'swatch' + ((S.accent || 'lime') === k ? ' on' : '')}
-              style={{ background: c }} onClick={() => update(s => { s.accent = k })} aria-label={k} />
+              style={{ background: S.theme === 'catppuccin'
+                ? `var(--${{ lime: 'green', sky: 'blue', orange: 'orange', violet: 'purple', pink: 'pink', red: 'red', teal: 'teal', gold: 'yellow' }[k]})` : c }}
+              onClick={() => update(s => { s.accent = k })} aria-label={k} />
           ))}
         </div>
       </div>

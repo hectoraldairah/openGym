@@ -105,6 +105,33 @@
 :root[data-theme="light"][data-accent="pink"],
 :root[data-theme="light"][data-accent="red"]   { --on-acc:#fff }
 
+/* Catppuccin Mocha — https://catppuccin.com/palette/
+   Keep accent choices in the same palette as surfaces and status colours. */
+:root[data-theme="catppuccin"] {
+  color-scheme: dark;
+  --bg:        #1e1e2e;
+  --bg-el:     #181825;
+  --surface:   #313244;
+  --surface-2: #45475a;
+  --surface-3: #585b70;
+
+  --label:     #cdd6f4;
+  --label-2:   #bac2de;
+  --label-3:   #a6adc8;
+  --label-4:   #7f849c;
+  --sep:       #45475a;
+  --sep-op:    rgba(69,71,90,.65);
+
+  --blue:#89b4fa; --green:#a6e3a1; --red:#f38ba8; --orange:#fab387;
+  --yellow:#f9e2af; --teal:#94e2d5; --indigo:#b4befe; --pink:#f5c2e7;
+  --purple:#cba6f7; --mint:#a6e3a1; --brown:#f2cdcd; --grey:#9399b2;
+}
+:root[data-theme="catppuccin"][data-accent] {
+  --on-acc:#1e1e2e;
+  --acc-2:color-mix(in srgb, var(--acc) 75%, #1e1e2e);
+}
+:root[data-theme="catppuccin"] .lrow-i { color:var(--bg); }
+
 /* ---------------------------------------------------------------- reset -- */
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html{
@@ -640,7 +667,7 @@ h4.sec{
 }
 
 /* ---------------------------------------------------------------- modal -- */
-#modal-root{position:fixed;inset:0;z-index:100;display:none}
+#modal-root{position:fixed;inset:0;bottom:auto;height:100%;z-index:100;display:none}
 #modal-root.open{display:block}
 .mback{
   position:absolute;inset:0;background:rgba(0,0,0,.4);
@@ -651,7 +678,7 @@ h4.sec{
   position:absolute;left:0;right:0;bottom:0;background:var(--bg-el);
   border-radius:var(--r-xl) var(--r-xl) 0 0;
   padding:8px 18px calc(20px + var(--sab));
-  max-height:90vh;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  max-height:90%;overflow-y:auto;-webkit-overflow-scrolling:touch;
   animation:sheetup .34s var(--ease);
   overscroll-behavior:contain;touch-action:pan-y;will-change:transform;
 }
@@ -662,6 +689,7 @@ h4.sec{
 .center{
   position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
   width:min(84vw,300px);background:var(--bg-el);border-radius:var(--r-lg);padding:20px;
+  max-height:calc(100% - 32px);overflow-y:auto;overscroll-behavior:contain;
   box-shadow:0 20px 60px -12px rgba(0,0,0,.5);
   animation:pop .28s var(--ease);
 }

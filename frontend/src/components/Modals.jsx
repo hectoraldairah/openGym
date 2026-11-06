@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 import { useUI } from '../store/useUI.js'
 
 // One bottom sheet (or centered dialog) with swipe-to-dismiss.
@@ -66,6 +66,30 @@ function Sheet({ sheet }) {
 
 export default function Modals() {
   const sheets = useUI(s => s.sheets)
+  const root = useRef(null)
+
+  // iOS keeps the layout viewport tall when the keyboard opens. Anchor overlays
+  // to the visual viewport instead, including Safari's focus-induced panning.
+  // Updating the root also keeps short sheets above the keyboard as results shrink.
+  useLayoutEffect(() => {
+    if (!sheets.length) return
+    const viewport = window.visualViewport
+    const resize = () => {
+      const el = root.current
+      if (!el) return
+      el.style.top = (viewport?.offsetTop || 0) + 'px'
+      el.style.height = (viewport?.height || window.innerHeight) + 'px'
+    }
+    resize()
+    viewport?.addEventListener('resize', resize)
+    viewport?.addEventListener('scroll', resize)
+    window.addEventListener('resize', resize)
+    return () => {
+      viewport?.removeEventListener('resize', resize)
+      viewport?.removeEventListener('scroll', resize)
+      window.removeEventListener('resize', resize)
+    }
+  }, [sheets.length > 0])
 
   // lock the page behind any open sheet (iOS-safe)
   useEffect(() => {
@@ -81,7 +105,7 @@ export default function Modals() {
 
   if (!sheets.length) return null
   return (
-    <div id="modal-root" className="open">
+    <div id="modal-root" className="open" ref={root}>
       {sheets.map(s => <Sheet key={s.id} sheet={s} />)}
     </div>
   )
