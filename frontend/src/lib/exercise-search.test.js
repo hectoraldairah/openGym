@@ -48,4 +48,15 @@ describe('searchExercises', () => {
     find('bench')
     expect(exercises).toEqual(before)
   })
+  it('finds catalogue categories by their familiar names and legacy labels', () => {
+    const catalogue = [
+      { id: 'crunch', n: 'crunch', bp: 'waist' },
+      { id: 'raise', n: 'heel raise', bp: 'lower legs' },
+      { id: 'lunge', n: 'lunge', bp: 'upper legs' }
+    ]
+    expect(searchExercises(catalogue, 'core').map(e => e.id)).toEqual(['crunch'])
+    expect(searchExercises(catalogue, 'calves').map(e => e.id)).toEqual(['raise'])
+    expect(searchExercises(catalogue, 'legs').map(e => e.id)).toContain('lunge')
+    expect(searchExercises(catalogue, 'waist').map(e => e.id)).toEqual(['crunch'])
+  })
 })

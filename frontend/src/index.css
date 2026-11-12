@@ -393,6 +393,7 @@ h4.sec{
   scrollbar-width:none;-webkit-overflow-scrolling:touch;
 }
 .chips::-webkit-scrollbar{display:none}
+.chips.bodypart-chips{flex-wrap:wrap;overflow-x:visible}
 .chip{
   flex:none;padding:6px 13px;border-radius:99px;background:var(--surface);
   font-size:14px;font-weight:400;color:var(--label);text-transform:capitalize;

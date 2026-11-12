@@ -4,7 +4,14 @@ import { t } from './i18n.js'
 export { EXDB }
 export const EXIDX = {}
 EXDB.forEach(e => { EXIDX[e.id] = e })
-export const BODYPARTS = [...new Set(EXDB.map(e => e.bp))].sort()
+export const BODYPARTS = [...new Set([...EXDB.map(e => e.bp), 'glutes'])].sort()
+// Keep catalogue IDs stable for saved routines and muscle maps, but show familiar names.
+export const BODY_PART_NAMES = {
+  waist: 'core', 'upper legs': 'legs', 'lower legs': 'calves',
+  'upper arms': 'arms', 'lower arms': 'forearms'
+}
+export const bodyPartName = part => t(BODY_PART_NAMES[part] || part)
+export const matchesBodyPart = (exercise, part) => !part || exercise.bp === part || (part === 'glutes' && exercise.tg === 'glutes')
 
 // Equipment options present in a given list of exercises, most common first (issue #6).
 // Deriving them from the *already filtered* list keeps the chip row short and means

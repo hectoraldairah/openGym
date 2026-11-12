@@ -1,5 +1,6 @@
 // Spanish UI strings. Keys are the English source strings (see lib/i18n.js).
 export default {
+  'legs': 'piernas', 'arms': 'brazos',
   'Confirm': 'Confirmar',
   'Cancel': 'Cancelar',
   'Delete': 'Eliminar',

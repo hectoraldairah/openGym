@@ -62,6 +62,7 @@ const BY_BODYPART = {
   'lower arms': { forearm: 1 },
   waist: { abs: 0.7, obliques: 0.3 },
   'upper legs': { quadriceps: 0.4, hamstring: 0.35, gluteal: 0.25 },
+  glutes: { gluteal: 1 },
   'lower legs': { calves: 0.8, tibialis: 0.2 },
   neck: { trapezius: 1 },
   cardio: {},

@@ -1,3 +1,5 @@
+import { BODY_PART_NAMES } from './exercises.js'
+
 const normalize = value => String(value || '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
 const documents = new WeakMap()
 
@@ -8,7 +10,7 @@ function documentOf(exercise) {
       name,
       fields: [
         { words: name.split(' '), penalty: 0, fuzzy: true },
-        { words: normalize([exercise.tg, exercise.bp, exercise.eq].join(' ')).split(' '), penalty: 8, fuzzy: true },
+        { words: normalize([exercise.tg, exercise.bp, BODY_PART_NAMES[exercise.bp], exercise.eq].join(' ')).split(' '), penalty: 8, fuzzy: true },
         { words: normalize(exercise.desc).split(' '), penalty: 12, fuzzy: false }
       ]
     })

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../store/useStore.js'
 import { useUI } from '../store/useUI.js'
-import { exOr } from '../lib/exercises.js'
+import { exOr, bodyPartName } from '../lib/exercises.js'
 import { effectiveRoutine, lastEntryFor, bestWeightFor, buildSets, setsDoneActive, workoutVolume, supersetUnits, unitOf, setLabel, modeOf, isBw, isPerSide, sideReps, repStep, EFFORT, effortOf, stepEffort, capEffort, removeActiveExercise } from '../lib/history.js'
 import { fmtNum, fmtVol, fmtDate, todayISO, exCount, DAYN } from '../lib/format.js'
 import { beep, vibrate } from '../lib/sound.js'
@@ -126,7 +126,7 @@ function ExerciseBlock({ entryIdx, compact, onToggle, onField, onAddSet, onRemov
       {/* You log the total; this is the split, so the set in front of you is unambiguous
           without the rep count having to mean two different things (issue #31). */}
       {!cardio && !timed && isPerSide(cfg) && <span className="tag acc nocap"><Icon name="shuffle" />{t('{0} per side', fmtNum(sideReps(entry.sets.find(s => !s.done)?.r ?? entry.sets[0]?.r)))}</span>}
-      {(ex.tg || ex.bp) && <span className="tag">{t(ex.tg || ex.bp)}</span>}
+      {(ex.tg || ex.bp) && <span className="tag">{ex.tg ? t(ex.tg) : bodyPartName(ex.bp)}</span>}
       {ex.eq && <span className="tag">{t(ex.eq)}</span>}
       {best > 0 && <span className="tag nocap">{t('Best:')} {fmtNum(shownWeight(best))} {weightUnit}</span>}
     </div>

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useStore } from '../store/useStore.js'
-import { EXDB, BODYPARTS, allExercises, equipmentOf } from '../lib/exercises.js'
+import { EXDB, BODYPARTS, bodyPartName, matchesBodyPart, allExercises, equipmentOf } from '../lib/exercises.js'
 import { bestWeightFor } from '../lib/history.js'
 import { fmtNum } from '../lib/format.js'
 import { t } from '../lib/i18n.js'
@@ -16,7 +16,7 @@ export default function Library() {
   const [bp, setBp] = useState('')
   const [eq, setEq] = useState('')
   const [shown, setShown] = useState(40)
-  const base = searchExercises(allExercises(S).filter(e => !bp || e.bp === bp), q)
+  const base = searchExercises(allExercises(S).filter(e => matchesBodyPart(e, bp)), q)
   const eqOpts = equipmentOf(base)
   // Drop the equipment filter if the search narrowed it away, so you never hit a dead end.
   const eqOn = eqOpts.includes(eq) ? eq : ''
@@ -26,9 +26,9 @@ export default function Library() {
     <div className="hdr"><div><h1>{t('Exercises')}</h1><div className="sub">{t('{0} exercises with animations', EXDB.length)}</div></div></div>
     <div className="search" style={{ marginBottom: 10 }}><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" /></svg>
       <input className="input" placeholder={t('Search…')} value={q} onChange={e => { setQ(e.target.value); setShown(40) }} /></div>
-    <div className="chips" style={{ marginBottom: eqOpts.length > 1 ? 8 : 12 }}>
+    <div className="chips bodypart-chips" style={{ marginBottom: eqOpts.length > 1 ? 8 : 12 }}>
       <button className={'chip nocap' + (!bp ? ' on' : '')} onClick={() => { setBp(''); setEq(''); setShown(40) }}>{t('All')}</button>
-      {BODYPARTS.map(b => <button key={b} className={'chip' + (bp === b ? ' on' : '')} onClick={() => { setBp(b); setEq(''); setShown(40) }}>{t(b)}</button>)}
+      {BODYPARTS.map(b => <button key={b} className={'chip' + (bp === b ? ' on' : '')} onClick={() => { setBp(b); setEq(''); setShown(40) }}>{bodyPartName(b)}</button>)}
     </div>
     {eqOpts.length > 1 && <div className="chips" style={{ marginBottom: 12 }}>
       <button className={'chip nocap' + (!eqOn ? ' on' : '')} onClick={() => { setEq(''); setShown(40) }}>{t('Any equipment')}</button>
@@ -43,7 +43,7 @@ export default function Library() {
         const best = bestWeightFor(S, e.id)
         return <div key={e.id} className="item" onClick={() => exerciseDetailSheet(e)}>
           <Thumb ex={e} />
-          <div className="grow"><div className="tt capitalize">{e.n}</div><div className="ss capitalize">{t(e.tg || e.bp)} · {t(e.eq)}</div></div>
+          <div className="grow"><div className="tt capitalize">{e.n}</div><div className="ss capitalize">{e.tg ? t(e.tg) : bodyPartName(e.bp)} · {t(e.eq)}</div></div>
           {best > 0 && <span className="tag acc">{fmtNum(best)}</span>}
           <Button size="sm" variant="tinted" icon="plus" onClick={ev => { ev.stopPropagation(); addToRoutineSheet(e) }}>{t('Plan')}</Button>
         </div>

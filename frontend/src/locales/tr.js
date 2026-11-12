@@ -1,5 +1,6 @@
 // Turkish UI strings. Keys are the English source strings (see lib/i18n.js).
 export default {
+  'legs': 'bacaklar', 'arms': 'kollar',
   'Confirm': 'Onayla',
   'Cancel': 'İptal',
   'Delete': 'Sil',
