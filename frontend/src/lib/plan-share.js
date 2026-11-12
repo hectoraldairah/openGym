@@ -12,6 +12,7 @@ import { EXIDX, isBodyweightEq } from './exercises.js'
 import { modeOf, fmtSec, isBw, isPerSide, sideReps } from './history.js'
 import { uid, todayISO, DAYN, fmtNum, exCount } from './format.js'
 import { t } from './i18n.js'
+import { routineSections, routineExercises, PHASE_NAME } from './routine-sections.js'
 
 const PLAN_FMT = 1
 const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0]   // Mon-first, matching the Plan screen
@@ -51,12 +52,15 @@ function cleanEx(e) {
 /** Build the shareable bundle: every routine, the week schedule, referenced customs. */
 export function buildPlanBundle(S, name) {
   const routines = (S.routines || []).map(r => ({
-    id: r.id, name: r.name, emoji: r.emoji, ...(r.prog ? { prog: r.prog } : {}), ex: (r.ex || []).map(cleanEx)
+    id: r.id, name: r.name, emoji: r.emoji, ...(r.prog ? { prog: r.prog } : {}), ex: (r.ex || []).map(cleanEx),
+    ...Object.fromEntries(['pre', 'post'].filter(phase => r[phase]).map(phase => [phase, {
+      enabled: r[phase].enabled !== false, ex: (r[phase].ex || []).map(cleanEx)
+    }]))
   }))
-  const usedIds = new Set(routines.flatMap(r => r.ex.map(e => e.id)))
+  const usedIds = new Set(routines.flatMap(r => routineExercises(r, { includeDisabled: true }).map(e => e.id)))
   const customEx = (S.customEx || [])
     .filter(c => usedIds.has(c.id))
-    .map(c => ({ id: c.id, n: c.n, bp: c.bp, ...(c.desc ? { desc: c.desc } : {}) }))
+    .map(c => ({ id: c.id, n: c.n, bp: c.bp, ...(c.desc ? { desc: c.desc } : {}), ...(c.videoUrl ? { videoUrl: c.videoUrl } : {}) }))
   const week = {}
   WEEK_ORDER.forEach(d => { if (S.week?.[d]) week[d] = S.week[d] })
   return { opengym_plan: PLAN_FMT, exported: todayISO(), name: name || '', week, routines, customEx }
@@ -79,14 +83,19 @@ export function parsePlan(raw) {
   const customEx = (Array.isArray(data.customEx) ? data.customEx : []).filter(c => c && c.id)
   const known = new Set(customEx.map(c => c.id))
   let dropped = 0
-  const routines = data.routines.filter(r => r && Array.isArray(r.ex)).map(r => ({
-    ...r,
-    ex: r.ex.filter(e => {
+  const filterExercises = list => list.filter(e => {
       const ok = !!e && (known.has(e.id) || !!EXIDX[e.id])
       if (!ok) dropped++
       return ok
-    })
-  }))
+  })
+  const routines = data.routines.filter(r => r && Array.isArray(r.ex)).map(r => {
+    const result = { ...r, ex: filterExercises(r.ex) }
+    for (const phase of ['pre', 'post']) if (r[phase] != null) {
+      if (!Array.isArray(r[phase].ex)) throw new Error(t('Optional workout blocks need an exercise list (ex).'))
+      result[phase] = { enabled: r[phase].enabled !== false, ex: filterExercises(r[phase].ex) }
+    }
+    return result
+  })
   return {
     name: (data.name || '').trim(),
     routines,
@@ -94,7 +103,7 @@ export function parsePlan(raw) {
     customEx,
     dropped,
     routineCount: routines.length,
-    exerciseCount: routines.reduce((n, r) => n + r.ex.length, 0),
+    exerciseCount: routines.reduce((n, r) => n + routineExercises(r, { includeDisabled: true }).length, 0),
     scheduledDays: WEEK_ORDER.filter(d => data.week?.[d]).length
   }
 }
@@ -114,7 +123,7 @@ export function mergePlan(s, bundle, { schedule } = {}) {
     if (same) { exIdMap[c.id] = same.id; return }
     const nid = uid()
     exIdMap[c.id] = nid
-    s.customEx.push({ id: nid, n: c.n, bp: c.bp, ...(c.desc ? { desc: c.desc } : {}) })
+    s.customEx.push({ id: nid, n: c.n, bp: c.bp, custom: true, eq: 'custom', tg: '', ...(c.desc ? { desc: c.desc } : {}), ...(c.videoUrl ? { videoUrl: c.videoUrl } : {}) })
   })
   const ridMap = {}
   bundle.routines.forEach(r => {
@@ -125,7 +134,11 @@ export function mergePlan(s, bundle, { schedule } = {}) {
       name: r.name || t('Shared routine'),
       emoji: r.emoji,
       ...(r.prog ? { prog: r.prog } : {}),
-      ex: (r.ex || []).map(e => ({ ...e, id: exIdMap[e.id] || e.id }))
+      ex: (r.ex || []).map(e => ({ ...e, id: exIdMap[e.id] || e.id })),
+      ...Object.fromEntries(['pre', 'post'].filter(phase => r[phase]).map(phase => [phase, {
+        enabled: r[phase].enabled !== false,
+        ex: (r[phase].ex || []).map(e => ({ ...e, id: exIdMap[e.id] || e.id }))
+      }]))
     })
   })
   if (schedule) {
@@ -169,7 +182,10 @@ function units(ex) {
 }
 
 function routineHTML(r, unit) {
-  const rows = units(r.ex).map(u => {
+  const sections = routineSections(r).filter(section => section.ex.length)
+  const rows = sections.map(section => {
+    const heading = sections.some(s => s.phase !== 'main') ? `<h3>${esc(t(PHASE_NAME[section.phase]))}</h3>` : ''
+    return heading + units(section.ex).map(u => {
     const items = u.map(e => {
       const ex = EXIDX[e.id]
       const name = ex ? ex.n : t('Unknown exercise')
@@ -179,8 +195,9 @@ function routineHTML(r, unit) {
     return u.length > 1
       ? `<div class="ss"><div class="ss-tag">${esc(t('Superset'))}</div><div class="ss-items">${items}</div></div>`
       : items
+    }).join('')
   }).join('')
-  const count = exCount(r.ex.length)
+  const count = exCount(routineExercises(r).length)
   return `<section class="routine">
     <div class="r-head"><h2>${esc(r.name)}</h2><span class="r-count">${esc(count)}</span></div>
     <div class="ex-list">${rows || `<div class="ex empty">${esc(t('No exercises yet.'))}</div>`}</div>
@@ -199,7 +216,7 @@ function weekHTML(S) {
 /** Full self-contained HTML for the print/PDF view. */
 export function planPrintHTML(S, owner) {
   const unit = S.unit || 'kg'
-  const routines = (S.routines || []).filter(r => r.ex && r.ex.length)
+  const routines = (S.routines || []).filter(r => routineExercises(r).length)
   const body = routines.length
     ? routines.map(r => routineHTML(r, unit)).join('')
     : `<p class="none">${esc(t('No routines yet.'))}</p>`

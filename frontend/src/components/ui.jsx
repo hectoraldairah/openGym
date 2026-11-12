@@ -76,9 +76,10 @@ export function SearchField({ value, onChange, onClear, ...rest }) {
 
 /* ============================ switch ============================ */
 
-export function Switch({ checked, onChange, disabled }) {
+export function Switch({ checked, onChange, disabled, ...rest }) {
   return (
     <button
+      {...rest}
       role="switch"
       aria-checked={!!checked}
       disabled={disabled}

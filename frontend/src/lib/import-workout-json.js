@@ -3,6 +3,7 @@ import { workoutVolume, bestWeightFor } from './history.js'
 import { convertWeight } from './weight.js'
 import { isoOf, uid } from './format.js'
 import { t } from './i18n.js'
+import { ROUTINE_PHASES, phaseOf } from './routine-sections.js'
 
 const object = value => value && typeof value === 'object' && !Array.isArray(value)
 const validId = value => typeof value === 'string' && /^[\w-]{1,128}$/.test(value) && !['__proto__', 'constructor', 'prototype'].includes(value)
@@ -56,9 +57,11 @@ export function parseWorkoutJSON(raw, { unit = 'kg', exercises = EXDB } = {}) {
         if (!Array.isArray(e.sets) || !e.sets.length) fail('Each exercise needs at least one set.')
         if (e.target != null && !object(e.target)) fail('The exercise target must be an object.')
         const sourceTarget = e.target || {}
+        const phase = e.phase ?? sourceTarget.phase ?? 'main'
+        if (!ROUTINE_PHASES.includes(phase)) fail('The workout phase must be pre, main, or post.')
         if (sourceTarget.mode != null && !['reps', 'time', 'cardio'].includes(sourceTarget.mode)) fail('The exercise mode must be reps, time, or cardio.')
         const mode = sourceTarget.mode || (e.sets[0]?.sec != null ? 'time' : e.sets[0]?.min != null ? 'cardio' : 'reps')
-        const target = { mode }
+        const target = { mode, phase }
         for (const field of ['weight', 'inc']) if (sourceTarget[field] != null) target[field] = weight(sourceTarget[field])
         for (const field of ['sets', 'reps', 'sec', 'min', 'speed', 'repsMin', 'repsMax']) if (sourceTarget[field] != null) target[field] = number(sourceTarget[field])
         for (const field of ['bodyweight', 'side']) if (sourceTarget[field] != null) {
@@ -89,7 +92,7 @@ export function parseWorkoutJSON(raw, { unit = 'kg', exercises = EXDB } = {}) {
           }
           return set
         })
-        return { id: e.id, sets, target, topW: e.topW == null ? null : weight(e.topW) }
+        return { id: e.id, phase, sets, target, topW: e.topW == null ? null : weight(e.topW) }
       })
       if (!entries.some(e => e.sets.some(s => s.done))) fail('Each workout needs at least one completed set.')
       if (w.id != null && !validId(w.id)) fail('The workout id is invalid.')
@@ -104,7 +107,7 @@ export function parseWorkoutJSON(raw, { unit = 'kg', exercises = EXDB } = {}) {
 }
 
 // IDs catch exported copies; the content key also catches repeated hand-written JSON without IDs.
-const fingerprint = w => JSON.stringify([w.d, w.name, w.start, w.end, w.entries.map(e => [e.id, e.sets.map(s => [!!s.done, s.w || 0, s.r ?? null, s.sec ?? null, s.min ?? null, s.speed ?? null, s.rir ?? null, s.rpe ?? null])])])
+const fingerprint = w => JSON.stringify([w.d, w.name, w.start, w.end, w.entries.map(e => [e.id, phaseOf(e), e.sets.map(s => [!!s.done, s.w || 0, s.r ?? null, s.sec ?? null, s.min ?? null, s.speed ?? null, s.rir ?? null, s.rpe ?? null])])])
 export function freshJSONWorkouts(existing, incoming) {
   const ids = new Set(existing.map(w => w.id))
   const content = new Set(existing.map(fingerprint))
@@ -131,6 +134,7 @@ export function mergeWorkoutJSON(S, parsed) {
     w.prs = [...new Set(w.entries.filter(e => Math.max(0, ...e.sets.filter(s => s.done).map(s => s.w || 0)) > bestWeightFor(previous, e.id)).map(e => e.id))]
     history.push(w)
     w.entries.forEach(e => {
+      if (phaseOf(e) !== 'main') return
       const max = Math.max(0, ...e.sets.filter(s => s.done).map(s => s.w || 0), e.sets.some(s => s.done) ? e.topW || 0 : 0)
       const current = S.exWeights[e.id]
       if (max > 0 && (!current || w.d >= current.d)) S.exWeights[e.id] = { w: max, d: w.d }

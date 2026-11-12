@@ -1,5 +1,15 @@
 // Spanish UI strings. Keys are the English source strings (see lib/i18n.js).
 export default {
+  'Pre-workout': 'Pre-entrenamiento',
+  'Main workout': 'Entrenamiento principal',
+  'Post-workout': 'Post-entrenamiento',
+  'Optional mobility and warm-up before your main workout.': 'Movilidad y calentamiento opcionales antes del entrenamiento principal.',
+  'Optional stretches and cooldown after your main workout.': 'Estiramientos y vuelta a la calma opcionales después del entrenamiento principal.',
+  'Choose the optional blocks for today. Your routine stays unchanged.': 'Elige los bloques opcionales para hoy. Tu rutina no se modifica.',
+  'Optional workout blocks need an exercise list (ex).': 'Los bloques opcionales necesitan una lista de ejercicios (ex).',
+  'The workout phase must be pre, main, or post.': 'La fase del entrenamiento debe ser pre, main o post.',
+  'Move up': 'Subir',
+  'Move down': 'Bajar',
   'Good morning': 'Buenos días',
   'Good morning, {0}': 'Buenos días, {0}',
   'Good afternoon': 'Buenas tardes',

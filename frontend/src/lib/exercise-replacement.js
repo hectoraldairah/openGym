@@ -3,6 +3,7 @@ import { defaultConfig, lastEntryFor, modeOf, buildSets } from './history.js'
 import { musclesOf } from './muscles.js'
 import { nextPrescription, applyPrescription } from './progression.js'
 import { t } from './i18n.js'
+import { phaseExercises, phaseOf } from './routine-sections.js'
 
 export function replacementCandidates(source, exercises) {
   const muscles = musclesOf(source)
@@ -25,10 +26,11 @@ export function replacementRoutineIndex(S, index) {
   const routine = S.routines.find(r => r.id === S.active?.routineId)
   if (!entry || !routine || entry.routineSource === null) return -1
   const source = entry.routineSource
+  const list = phaseExercises(routine, source?.phase || phaseOf(entry))
   const config = source?.config || entry.target
   if (!config) return -1
-  if (source && sameConfig(routine.ex[source.index], config)) return source.index
-  const matches = routine.ex.map((e, i) => sameConfig(e, config) ? i : -1).filter(i => i >= 0)
+  if (source && sameConfig(list[source.index], config)) return source.index
+  const matches = list.map((e, i) => sameConfig(e, config) ? i : -1).filter(i => i >= 0)
   return matches.length === 1 ? matches[0] : -1
 }
 
@@ -37,11 +39,12 @@ export function replacementConfig(S, index, exercise) {
   const mode = isCardio(exercise) ? 'cardio' : modeOf({ ...old.target, id: old.id }) === 'time' ? 'time' : 'reps'
   const config = defaultConfig(exercise.id, mode)
   config.sets = Math.max(1, old.sets.filter(s => !s.done).length)
-  const last = lastEntryFor(S, exercise.id)
+  const last = lastEntryFor(S, exercise.id, phaseOf(old))
   const previous = last?.sets[0]
   if (mode === 'time') config.sec = previous?.sec || old.target?.sec || config.sec
   else if (mode === 'reps') config.reps = previous?.r || old.target?.reps || config.reps
-  if (mode !== 'cardio') config.weight = S.exWeights[exercise.id]?.w || previous?.w || 0
+  if (mode !== 'cardio') config.weight = (phaseOf(old) === 'main' ? S.exWeights[exercise.id]?.w : 0) || previous?.w || 0
+  if (phaseOf(old) !== 'main') config.prog = 'off'
   return config
 }
 
@@ -56,30 +59,33 @@ export function replaceActiveExercise(S, index, exercise, config, { updateRoutin
   const routine = S.routines.find(r => r.id === active.routineId)
   const slot = replacementRoutineIndex(S, index)
   if (updateRoutine && slot < 0) throw new Error(t('The original routine changed. Replace only for today or reopen the selector.'))
-  const source = old.routineSource || (slot >= 0 ? { index: slot, config: { ...routine.ex[slot] } } : null)
-  const full = { ...config, id: exercise.id }
+  const phase = phaseOf(old)
+  const list = phaseExercises(routine, old.routineSource?.phase || phase)
+  const source = old.routineSource || (slot >= 0 ? { phase, index: slot, config: { ...list[slot] } } : null)
+  const full = { ...config, id: exercise.id, phase }
   if (old.sg) full.sg = old.sg
   else delete full.sg
   const plan = nextPrescription(S, full, routine)
   const replacement = {
-    id: exercise.id, target: full, plan,
+    id: exercise.id, phase, target: full, plan,
     sets: applyPrescription(buildSets(S, full), plan),
     routineSource: source
   }
   if (old.sg) replacement.sg = old.sg
   if (updateRoutine) {
-    const planned = { ...full, sets: routine.ex[slot].sets || full.sets }
-    if (routine.ex[slot].sg) planned.sg = routine.ex[slot].sg
+    const planned = { ...full, sets: list[slot].sets || full.sets }
+    delete planned.phase
+    if (list[slot].sg) planned.sg = list[slot].sg
     else delete planned.sg
-    routine.ex[slot] = planned
-    replacement.routineSource = { index: slot, config: { ...planned } }
+    list[slot] = planned
+    replacement.routineSource = { phase, index: slot, config: { ...planned } }
   }
   const logged = old.sets.filter(s => s.done)
   if (logged.length) {
     // Keep the replacement adjacent to every superset partner, even when the replaced
     // exercise was the second/third member. Archive its logs before the whole group.
     let groupStart = index
-    while (old.sg && groupStart > 0 && active.entries[groupStart - 1].sg === old.sg) groupStart--
+    while (old.sg && groupStart > 0 && active.entries[groupStart - 1].sg === old.sg && phaseOf(active.entries[groupStart - 1]) === phase) groupStart--
     old.sets = logged
     delete old.sg
     if (old.target) { old.target = { ...old.target }; delete old.target.sg }

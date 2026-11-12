@@ -131,7 +131,7 @@ export function readSession(entry, fallback) {
 export function sessionsFor(S, exId, fallback) {
   const out = []
   ;(S.workouts || []).forEach(w => {
-    const entry = w.entries.find(e => e.id === exId)
+    const entry = w.entries.find(e => e.id === exId && (e.phase || e.target?.phase || 'main') === (fallback?.phase || 'main'))
     if (entry && entry.sets.some(s => s.done)) out.push({ d: w.d, ...readSession(entry, fallback) })
   })
   return out

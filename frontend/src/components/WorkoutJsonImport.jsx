@@ -6,6 +6,7 @@ import { parseWorkoutJSON, freshJSONWorkouts, mergeWorkoutJSON } from '../lib/im
 import { fmtDate, fmtVol, todayISO, exCount } from '../lib/format.js'
 import { setsDone, setLabel } from '../lib/history.js'
 import { t } from '../lib/i18n.js'
+import { phaseOf, PHASE_NAME } from '../lib/routine-sections.js'
 import { Button } from './ui.jsx'
 
 export default function WorkoutJsonImport({ close }) {
@@ -89,7 +90,7 @@ export default function WorkoutJsonImport({ close }) {
           <div className="tt">{w.name}</div>
           <div className="ss">{fmtDate(w.d)} · {exCount(w.entries.length)} · {fmtVol(w.vol, parsed.unit)}</div>
           {w.entries.map((entry, i) => <div key={i} style={{ marginTop: 8 }}>
-            <div className="small capitalize">{exerciseNames.get(entry.id) || entry.id}</div>
+            <div className="small capitalize">{exerciseNames.get(entry.id) || entry.id}{phaseOf(entry) !== 'main' && <span className="tag" style={{ marginLeft: 6 }}>{t(PHASE_NAME[phaseOf(entry)])}</span>}</div>
             <div className="small muted">{entry.sets.filter(s => s.done).map(s => setLabel(entry.id, s, entry.target)).join(' · ') || t('no sets')}</div>
           </div>)}
         </div></div>)}

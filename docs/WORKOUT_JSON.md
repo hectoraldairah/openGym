@@ -51,6 +51,7 @@ El botón **Usar JSON de ejemplo** prepara un ejemplo editable con la fecha actu
 | `bw` | Peso corporal de esa sesión, en la unidad del archivo. Opcional. |
 | `entries` | Ejercicios y sus series. Obligatorio. |
 | `entries[].id` | ID del ejercicio del catálogo o de un ejercicio personalizado. |
+| `entries[].phase` | Bloque de la sesión: `pre`, `main` o `post`. Si se omite, se usa `main`. |
 | `entries[].target` | Configuración prescrita de la sesión. Opcional. |
 | `entries[].topW` | Peso de trabajo confirmado. Opcional. |
 | `sets[].done` | Si la serie se completó. Se asume `true` cuando se omite. |

@@ -56,9 +56,8 @@ export function bestSetOf(entry, formula = DEFAULT_FORMULA) {
 export function e1rmSeries(S, exId, formula = DEFAULT_FORMULA) {
   const pts = []
   ;(S.workouts || []).forEach(w => {
-    const entry = w.entries.find(e => e.id === exId)
-    if (!entry) return
-    const best = bestSetOf(entry, formula)
+    const best = w.entries.filter(e => e.id === exId).map(e => bestSetOf(e, formula))
+      .reduce((best, candidate) => candidate && (!best || candidate.est > best.est) ? candidate : best, null)
     if (best) pts.push({ t: w.start, d: w.d, y: best.est, w: best.w, r: best.r })
   })
   return pts

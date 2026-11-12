@@ -4,6 +4,7 @@ import { effectiveRoutine } from '../lib/history.js'
 import { todayISO } from '../lib/format.js'
 import { t } from '../lib/i18n.js'
 import Icon from './Icon.jsx'
+import { routineExercises } from '../lib/routine-sections.js'
 
 export default function TabBar({ onStart }) {
   const nav = useNavigate()
@@ -18,7 +19,7 @@ export default function TabBar({ onStart }) {
   const startWorkout = () => {
     if (!S.active) {
       const r = effectiveRoutine(S, todayISO())
-      if (r && r.ex.length) { onStart(r.id); return }
+      if (r && routineExercises(r).length) { onStart(r.id); return }
     }
     nav('/workout')
   }

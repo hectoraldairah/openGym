@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { useStore } from './store/useStore.js'
 import { useUI } from './store/useUI.js'
-import { EXDB, EXIDX, BODYPARTS, bodyPartName, matchesBodyPart, isCardio, isBodyweightEq, allExercises, equipmentOf } from './lib/exercises.js'
+import { EXDB, EXIDX, BODYPARTS, exOr, bodyPartName, matchesBodyPart, isCardio, isBodyweightEq, allExercises, equipmentOf } from './lib/exercises.js'
 import { fmtDate, fmtNum, fmtVol, fmtDur, durPart, todayISO, uid, exCount, DAYN, MONTHS_LONG, ACCENTS } from './lib/format.js'
-import { lastEntryFor, bestWeightFor, buildSets, effectiveRoutineId, workoutVolume, setsDone, setsDoneActive, lastBW, supersetUnits, unitOf, setLabel, defaultConfig, cleanupSg, modeOf, effortOf, isBw, isPerSide, sideReps } from './lib/history.js'
+import { lastEntryFor, bestWeightFor, effectiveRoutineId, workoutVolume, setsDone, setsDoneActive, lastBW, supersetUnits, unitOf, setLabel, defaultConfig, cleanupSg, modeOf, effortOf, isBw, isPerSide, sideReps } from './lib/history.js'
 import { beep, vibrate } from './lib/sound.js'
 import { t, instrFor, getLang, INSTR_LANGS } from './lib/i18n.js'
 import { nav } from './lib/nav.js'
@@ -18,7 +18,7 @@ import { loadOfWorkouts } from './lib/muscles.js'
 import { parseImport, mergeImport } from './lib/import-csv.js'
 import { buildPlanBundle, parsePlan, mergePlan, printPlan } from './lib/plan-share.js'
 import { estimate1RM, best1RM, REP_CAP } from './lib/onerm.js'
-import { nextPrescription, applyPrescription, policyFor, defaultIncrement, POLICIES_FOR, POLICY_NAME, POLICY_DESC, MAX_BW_SETS } from './lib/progression.js'
+import { policyFor, defaultIncrement, POLICIES_FOR, POLICY_NAME, POLICY_DESC, MAX_BW_SETS } from './lib/progression.js'
 import { MOBILE, shareExport } from './lib/mobile.js'
 import { exerciseWeightUnit, convertWeight, displayWeight } from './lib/weight.js'
 import { youtubeVideo } from './lib/youtube.js'
@@ -29,6 +29,8 @@ import ExerciseReplacement from './components/ExerciseReplacement.jsx'
 import { replacementConfig, replaceActiveExercise } from './lib/exercise-replacement.js'
 import WorkoutJsonImport from './components/WorkoutJsonImport.jsx'
 import { searchExercises } from './lib/exercise-search.js'
+import { routineExercises, routineSections, phaseExercises, phaseOf, PHASE_NAME } from './lib/routine-sections.js'
+import { routineWorkoutEntries } from './lib/routine-workout.js'
 
 const S = () => useStore.getState().S
 const update = (...a) => useStore.getState().update(...a)
@@ -339,8 +341,8 @@ function AddToRoutine({ ex, close }) {
     <div className="list">
       {st.routines.map(r => <div key={r.id} className="item" onClick={() => pick(r.id)}>
         <span className="lrow-i"><Icon name={glyphOf(r.emoji)} /></span>
-        <div className="grow"><div className="tt">{r.name}</div><div className="ss">{exCount(r.ex.length)}</div></div>
-        {r.ex.some(e => e.id === ex.id) && <span className="tag">{t('already in')}</span>}<Icon name="plus" className="chev" />
+        <div className="grow"><div className="tt">{r.name}</div><div className="ss">{exCount(routineExercises(r).length)}</div></div>
+        {routineExercises(r).some(e => e.id === ex.id) && <span className="tag">{t('already in')}</span>}<Icon name="plus" className="chev" />
       </div>)}
       <div className="item" onClick={() => pick('_new')}><span className="lrow-i" style={{ background: 'var(--surface-3)' }}><Icon name="sparkles" /></span>
         <div className="grow"><div className="tt">{t('New routine')}</div><div className="ss">{t('Create one and start with this exercise')}</div></div><Icon name="plus" className="chev" /></div>
@@ -406,7 +408,11 @@ export function deleteCustomEx(ex, afterDelete) {
     onConfirm: () => {
       update(s => {
         s.customEx = (s.customEx || []).filter(x => x.id !== ex.id)
-        s.routines.forEach(r => { r.ex = r.ex.filter(e => e.id !== ex.id); cleanupSg(r.ex) })
+        s.routines.forEach(r => { routineSections(r, { includeDisabled: true }).forEach(section => {
+          const list = phaseExercises(r, section.phase)
+          for (let i = list.length - 1; i >= 0; i--) if (list[i].id === ex.id) list.splice(i, 1)
+          cleanupSg(list)
+        }) })
         // stamp the name into history entries so past workouts stay readable
         s.workouts.forEach(w => w.entries.forEach(e => { if (e.id === ex.id) e.n = ex.n }))
         delete s.exWeights[ex.id]
@@ -422,7 +428,7 @@ export function deleteCustomEx(ex, afterDelete) {
 // Exercises already used in your routines or past workouts (for the "Chosen" filter + a marker).
 function usageMap(st) {
   const u = {}
-  st.routines.forEach(r => r.ex.forEach(e => { u[e.id] = (u[e.id] || 0) + 1 }))
+  st.routines.forEach(r => routineExercises(r, { includeDisabled: true }).forEach(e => { u[e.id] = (u[e.id] || 0) + 1 }))
   st.workouts.forEach(w => w.entries.forEach(e => { u[e.id] = (u[e.id] || 0) + 1 }))
   return u
 }
@@ -479,7 +485,8 @@ export function replaceExerciseSheet(entryIdx) {
   const stillCurrent = () => S().active?.id === activeId && S().active.entries[entryIdx]?.id === originalId && !ui().work
   ui().openSheet(close => <ExerciseReplacement entryIdx={entryIdx} close={close} onChoose={(exercise, updateRoutine) => {
     if (!stillCurrent()) { toast(t('The workout changed. Choose the exercise again.')); return }
-    const routine = S().routines.find(r => r.id === S().active.routineId)
+    const savedRoutine = S().routines.find(r => r.id === S().active.routineId)
+    const routine = phaseOf(S().active.entries[entryIdx]) === 'main' ? savedRoutine : { ...savedRoutine, prog: 'off' }
     exConfigSheet(exercise, replacementConfig(S(), entryIdx, exercise), config => {
       if (!stillCurrent()) { toast(t('The workout changed. Choose the exercise again.')); return }
       try {
@@ -666,7 +673,7 @@ function PlanTools({ close }) {
   const st = useStore(s => s.S)
   const user = useStore(s => s.user)
   const fileRef = useRef(null)
-  const hasRoutines = (st.routines || []).some(r => r.ex && r.ex.length)
+  const hasRoutines = (st.routines || []).some(r => routineExercises(r, { includeDisabled: true }).length)
 
   const exportFile = async () => {
     const bundle = buildPlanBundle(st, user?.name ? t('{0}’s plan', user.name) : '')
@@ -757,7 +764,7 @@ function DayOverride({ iso, close }) {
     <div className="list">
       {st.routines.map(r => <div key={r.id} className="item" onClick={() => set(r.id)}>
         <span className="lrow-i"><Icon name={glyphOf(r.emoji)} /></span>
-        <div className="grow"><div className="tt">{r.name}</div><div className="ss">{exCount(r.ex.length)}</div></div>
+        <div className="grow"><div className="tt">{r.name}</div><div className="ss">{exCount(routineExercises(r).length)}</div></div>
         {effId === r.id && <Icon name="check" className="accent" />}</div>)}
       <div className="item" onClick={() => set('rest')}><span className="lrow-i" style={{ background: 'var(--surface-3)' }}><Icon name="moon" /></span><div className="grow"><div className="tt">{t('Rest / skip this day')}</div></div>{effId === null && <Icon name="check" className="accent" />}</div>
       {hasOvr && <div className="item" onClick={() => set('')}><span className="lrow-i" style={{ background: 'var(--surface-3)' }}><Icon name="reset" /></span><div className="grow"><div className="tt">{t('Back to weekly plan')}</div></div></div>}
@@ -775,7 +782,7 @@ function DayAssign({ day, close }) {
       <div className="item" onClick={() => set('')}><span className="lrow-i" style={{ background: 'var(--surface-3)' }}><Icon name="moon" /></span><div className="grow"><div className="tt">{t('Rest day')}</div></div>{!st.week[day] && <Icon name="check" className="accent" />}</div>
       {st.routines.map(r => <div key={r.id} className="item" onClick={() => set(r.id)}>
         <span className="lrow-i"><Icon name={glyphOf(r.emoji)} /></span>
-        <div className="grow"><div className="tt">{r.name}</div><div className="ss">{exCount(r.ex.length)}</div></div>
+        <div className="grow"><div className="tt">{r.name}</div><div className="ss">{exCount(routineExercises(r).length)}</div></div>
         {st.week[day] === r.id && <Icon name="check" className="accent" />}</div>)}
     </div>
   </>
@@ -785,15 +792,19 @@ export const dayAssignSheet = day => ui().openSheet(close => <DayAssign day={day
 /* ============================ workout detail ============================ */
 function WorkoutDetail({ w, close }) {
   const st = useStore(s => s.S)
+  const hasBlocks = w.entries.some(e => phaseOf(e) !== 'main')
   return <>
     <h3>{w.name}</h3>
     <div className="muted small" style={{ marginBottom: 12 }}>{[fmtDate(w.d, true), ...durPart(w.end - w.start), fmtVol(w.vol, st.unit), ...(w.bw ? [fmtNum(w.bw) + ' ' + st.unit] : [])].join(' · ')}</div>
     {w.entries.map((e, i) => {
       const ex = EXIDX[e.id]
-      return <div key={i} className="row" style={{ marginBottom: 12, alignItems: 'flex-start' }}>
+      return <div key={i}>
+        {hasBlocks && (i === 0 || phaseOf(w.entries[i - 1]) !== phaseOf(e)) && <h4 className="sec">{t(PHASE_NAME[phaseOf(e)])}</h4>}
+        <div className="row" style={{ marginBottom: 12, alignItems: 'flex-start' }}>
         {ex && <Thumb ex={ex} />}
         <div className="grow"><div className="tt capitalize" style={{ fontWeight: 600 }}>{ex ? ex.n : (e.n || e.id)} {w.prs && w.prs.includes(e.id) && <span className="pr"><Icon name="trophy" />PR</span>}</div>
           <div className="ss">{e.sets.filter(s => s.done).map(s => setLabel(e.id, s, e.target)).join('  ·  ') || t('no sets')}</div></div>
+        </div>
       </div>
     })}
     <Button variant="danger" onClick={() => confirmSheet({ title: t('Delete workout?'), message: t('This removes it from your history for good.'), confirmText: t('Delete'), danger: true, onConfirm: () => { update(s => { s.workouts = s.workouts.filter(x => x.id !== w.id) }); close(); toast(t('Workout deleted')) } })}>{t('Delete workout')}</Button>
@@ -859,18 +870,34 @@ export function WorkoutRow({ w, onClick }) {
 
 /* ============================ workout lifecycle ============================ */
 export function startFlow(routineId) {
-  bwSheet({ required: true, onDone: bw => beginWorkout(routineId, bw) })
+  bwSheet({ required: true, onDone: bw => {
+    const routine = S().routines.find(r => r.id === routineId)
+    if (routineSections(routine).some(section => section.phase !== 'main' && section.ex.length)) {
+      ui().openSheet(close => <WorkoutBlocksStart routineId={routineId} bw={bw} close={close} />)
+    } else beginWorkout(routineId, bw)
+  } })
 }
-export function beginWorkout(routineId, bw) {
+function WorkoutBlocksStart({ routineId, bw, close }) {
+  const state = useStore(s => s.S)
+  const [included, setIncluded] = useState({ pre: true, post: true })
+  const routine = state.routines.find(r => r.id === routineId)
+  return <>
+    <h3>{routine?.name || t('Start workout')}</h3>
+    <div className="muted small" style={{ marginBottom: 14 }}>{t('Choose the optional blocks for today. Your routine stays unchanged.')}</div>
+    {routineSections(routine).filter(section => section.phase !== 'main' && section.ex.length).map(section => <div key={section.phase} className="row between" style={{ marginBottom: 16, gap: 12 }}>
+      <div><div className="tt">{t(PHASE_NAME[section.phase])}</div><div className="small muted">{section.ex.map(e => exOr(e.id).n).join(' · ')}</div></div>
+      <Switch aria-label={t(PHASE_NAME[section.phase])} checked={included[section.phase]} onChange={value => setIncluded(current => ({ ...current, [section.phase]: value }))} />
+    </div>)}
+    <Button variant="primary" icon="play" onClick={() => { close(); beginWorkout(routineId, bw, included) }}>{t('Start workout')}</Button>
+  </>
+}
+export function beginWorkout(routineId, bw, included = {}) {
   const st = S()
   const r = routineId ? st.routines.find(x => x.id === routineId) : null
   // The prescription is applied as the session is built, so you walk up to the bar with the
   // right weight already on the screen instead of being told about it afterwards. `plan` is
   // kept on the entry purely so the workout can explain the number it chose.
-  const entries = (r ? r.ex : []).map((cfg, index) => {
-    const plan = nextPrescription(st, cfg, r)
-    return { id: cfg.id, sg: cfg.sg, target: { ...cfg }, plan, sets: applyPrescription(buildSets(st, cfg), plan), routineSource: { index, config: { ...cfg } } }
-  })
+  const entries = routineWorkoutEntries(st, r, included)
   update(s => {
     s.active = { id: uid(), d: todayISO(), start: Date.now(), routineId, name: r ? r.name : t('Freestyle'), bw: bw || null, cur: 0, entries }
   })
@@ -984,12 +1011,13 @@ function doFinishWorkout() {
     // `target` (what the session prescribed) is kept alongside the sets: without it a
     // finished workout cannot say whether it hit its reps, and a timed session reads back
     // as "0 reps". It is what the progression engine works from.
-    entries: A.entries.map(e => ({ id: e.id, sets: e.sets, topW: e.topW || null, target: e.target || null })).filter(e => e.sets.some(s => s.done)),
+    entries: A.entries.map(e => ({ id: e.id, phase: phaseOf(e), sets: e.sets, topW: e.topW || null, target: e.target || null })).filter(e => e.sets.some(s => s.done)),
     prs
   }
   w.vol = workoutVolume(w)
   update(s => {
     w.entries.forEach(e => {
+      if (phaseOf(e) !== 'main') return
       const mx = Math.max(0, ...e.sets.filter(x => x.done).map(x => x.w || 0), e.topW || 0)
       if (mx > 0) { const cur = s.exWeights[e.id]; if (!cur || mx > cur.w) s.exWeights[e.id] = { w: mx, d: w.d } }
     })

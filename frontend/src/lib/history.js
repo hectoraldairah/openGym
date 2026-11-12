@@ -2,6 +2,7 @@
 import { todayISO, isoOf, weekKey, fmtNum } from './format.js'
 import { isCardio, isBodyweightEq } from './exercises.js'
 import { t } from './i18n.js'
+import { phaseOf } from './routine-sections.js'
 
 // How an exercise is logged (issue #16). This used to be derived from the body part alone,
 // which meant a plank or a farmer's carry could only be timed by filing it under cardio.
@@ -134,13 +135,13 @@ export function exLine(cfg, unit) {
 // Drop superset ids that no longer have an adjacent partner (after unlink/reorder/remove).
 export function cleanupSg(ex) {
   ex.forEach((e, i) => {
-    if (e.sg && !(ex[i - 1]?.sg === e.sg || ex[i + 1]?.sg === e.sg)) delete e.sg
+    if (e.sg && ![ex[i - 1], ex[i + 1]].some(other => other?.sg === e.sg && phaseOf(other) === phaseOf(e))) delete e.sg
   })
 }
 
-export function lastEntryFor(S, exId) {
+export function lastEntryFor(S, exId, phase = 'main') {
   for (let i = S.workouts.length - 1; i >= 0; i--) {
-    const en = S.workouts[i].entries.find(e => e.id === exId)
+    const en = S.workouts[i].entries.find(e => e.id === exId && phaseOf(e) === phase)
     // `target` is what the session prescribed; finished workouts carry it so labels and the
     // progression engine can read a session back the way it was logged. Older workouts have
     // none — modeOf() falls back to the body part for them, which is what they were.
@@ -170,7 +171,8 @@ export function effectiveRoutine(S, iso) {
   return id ? S.routines.find(r => r.id === id) || null : null
 }
 export function buildSets(S, cfg) {
-  const last = lastEntryFor(S, cfg.id)
+  const fixed = phaseOf(cfg) !== 'main' && (!cfg.prog || cfg.prog === 'off')
+  const last = fixed ? null : lastEntryFor(S, cfg.id, phaseOf(cfg))
   const n = Math.max(1, cfg.sets || 1)
   const mode = modeOf(cfg)
   const sets = []
@@ -194,7 +196,7 @@ export function buildSets(S, cfg) {
     }
     return sets
   }
-  const conf = S.exWeights[cfg.id]
+  const conf = fixed ? null : S.exWeights[cfg.id]
   for (let i = 0; i < n; i++) {
     const prev = prevAt(i)
     const usable = prev && prev.r > 0 ? prev : null
@@ -228,7 +230,7 @@ export function supersetUnits(items) {
   const units = []
   items.forEach((e, i) => {
     const prev = items[i - 1]
-    if (i > 0 && e.sg && prev && prev.sg && e.sg === prev.sg) units[units.length - 1].push(i)
+    if (i > 0 && e.sg && prev && prev.sg && e.sg === prev.sg && phaseOf(e) === phaseOf(prev)) units[units.length - 1].push(i)
     else units.push([i])
   })
   return units

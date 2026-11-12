@@ -16,6 +16,8 @@ import { Button, Check, NumberField, Segmented } from '../components/ui.jsx'
 import { exerciseWeightUnit, convertWeight, displayWeight } from '../lib/weight.js'
 import { nextPrescription, applyPrescription } from '../lib/progression.js'
 import { glyphOf } from '../lib/glyphs.js'
+import { routineExercises, phaseOf, ROUTINE_PHASES, PHASE_NAME } from '../lib/routine-sections.js'
+import { insertPhaseEntry } from '../lib/routine-workout.js'
 
 /* ---------- start chooser (no active workout) ---------- */
 function StartChooser() {
@@ -29,7 +31,7 @@ function StartChooser() {
     {todayR && <div className="card" style={{ borderColor: 'var(--acc)' }}>
       <h2 className="accent">{t("Today's plan")}{todayOvr ? ' · ' + t('rescheduled') : ''}</h2>
       <div className="row between" style={{ marginBottom: 12 }}>
-        <div><div className="big">{todayR.name}</div><div className="muted small">{exCount(todayR.ex.length)}</div></div>
+        <div><div className="big">{todayR.name}</div><div className="muted small">{exCount(routineExercises(todayR).length)}</div></div>
         <span className="lrow-i" style={{ width: 38, height: 38, borderRadius: 9, fontSize: 22 }}><Icon name={glyphOf(todayR.emoji)} /></span>
       </div>
       <Button variant="primary" icon="play" onClick={() => startFlow(todayR.id)}>{t('Start {0}', todayR.name)}</Button>
@@ -37,7 +39,7 @@ function StartChooser() {
     {others.length > 0 && <><h4 className="sec">{t('Other routines')}</h4>
       <div className="list">{others.map(r => <div key={r.id} className="item" onClick={() => startFlow(r.id)}>
         <span className="lrow-i"><Icon name={glyphOf(r.emoji)} /></span>
-        <div className="grow"><div className="tt">{r.name}</div><div className="ss">{exCount(r.ex.length)}</div></div>
+        <div className="grow"><div className="tt">{r.name}</div><div className="ss">{exCount(routineExercises(r).length)}</div></div>
         <span className="tag acc">{t('Start')}</span></div>)}</div></>}
     <div style={{ height: 14 }} />
     <Button icon="shuffle" onClick={() => startFlow(null)}>{t('Freestyle workout (pick as you go)')}</Button>
@@ -70,7 +72,7 @@ function ExerciseBlock({ entryIdx, compact, onToggle, onField, onAddSet, onRemov
   const mode = modeOf({ ...(entry.target || {}), id: entry.id })
   const cardio = mode === 'cardio'
   const timed = mode === 'time'
-  const last = lastEntryFor(S, entry.id)
+  const last = lastEntryFor(S, entry.id, phaseOf(entry))
   // The same number the "confirm your working weight" sheet calls your best, so the two
   // never disagree inside one session: heaviest logged set, or the working weight you kept.
   const best = cardio ? 0 : Math.max(bestWeightFor(S, entry.id), (S.exWeights[entry.id] || {}).w || 0)
@@ -117,12 +119,12 @@ function ExerciseBlock({ entryIdx, compact, onToggle, onField, onAddSet, onRemov
     </div>
   )
   return <>
-    <Media ex={ex} key={entry.id} compact={compact} minimizable />
+    <Media ex={ex} key={`media:${entry.id}`} compact={compact} minimizable />
     <div className="row between" style={{ marginBottom: 6 }}>
       <div style={{ fontSize: compact ? 17 : 20, fontWeight: 600, letterSpacing: '-.02em', textTransform: 'capitalize', lineHeight: 1.2 }}>{ex.n}</div>
       <button className="iconbtn" aria-label={t('Details')} onClick={() => exerciseDetailSheet(ex)}><Icon name="info" /></button>
     </div>
-    <ExerciseNotes key={entry.id} exerciseId={entry.id} />
+    <ExerciseNotes key={`notes:${entry.id}`} exerciseId={entry.id} />
     <div className="row" style={{ gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
       {cardio && <span className="tag acc"><Icon name="figureRun" />{t('Cardio')}</span>}
       {/* You log the total; this is the split, so the set in front of you is unambiguous
@@ -181,6 +183,10 @@ function ActiveWorkout() {
   const unit = A.entries.length ? unitOf(units, cur) : []
   const unitIdx = units.findIndex(u => u === unit)
   const isSuperset = unit.length > 1
+  const phase = phaseOf(A.entries[cur])
+  const phases = ROUTINE_PHASES.filter(p => A.entries.some(e => phaseOf(e) === p))
+  const savedRoutine = S.routines.find(r => r.id === A.routineId)
+  const policyRoutine = phase === 'main' ? savedRoutine : { ...savedRoutine, prog: 'off' }
 
   const total = A.entries.reduce((n, e) => n + e.sets.length, 0)
   const done = setsDoneActive(A)
@@ -247,7 +253,7 @@ function ActiveWorkout() {
         // Only loaded reps training has a "working weight" worth confirming — a bodyweight
         // plank has nothing to put in that slider, and neither does a set of push-ups
         // (issue #32: the fewest taps that still record what happened).
-        const loaded = m === 'reps' && !(isBw({ ...(e.target || {}), id: e.id }) && !e.sets.some(x => x.w > 0))
+        const loaded = phaseOf(e) === 'main' && m === 'reps' && !(isBw({ ...(e.target || {}), id: e.id }) && !e.sets.some(x => x.w > 0))
         if (e.sets.every(x => x.done)) { exJustDone = true; if (loaded && !e.asked) { e.asked = true; askTop = true } }
       }
     })
@@ -297,6 +303,10 @@ function ActiveWorkout() {
       <button className="iconbtn" style={{ color: 'var(--acc)' }} aria-label={t('Finish')} onClick={finishWorkout}><Icon name="check" /></button>
     </div>
     <div className="wprog"><i style={{ width: (total ? done / total * 100 : 0) + '%' }} /></div>
+    {phases.some(p => p !== 'main') && <div className="chips bodypart-chips" style={{ marginBottom: 14 }}>
+      {phases.map(p => <button key={p} disabled={!!useUI.getState().work} className={'chip' + (phase === p ? ' on' : '')}
+        onClick={() => update(s => { s.active.cur = s.active.entries.findIndex(e => phaseOf(e) === p) })}>{t(PHASE_NAME[p])}</button>)}
+    </div>}
 
     {A.entries.length ? <>
       <div className="muted small" style={{ marginBottom: 6 }}>{isSuperset ? t('Superset {0} / {1}', unitIdx + 1, units.length) : t('Exercise {0} / {1}', unitIdx + 1, units.length)}</div>
@@ -322,11 +332,10 @@ function ActiveWorkout() {
     </div>
     <div style={{ height: 10 }} />
     <Button onClick={() => exercisePicker(ex => exConfigSheet(ex, null, cfg => update(s => {
-      const full = { ...cfg, id: ex.id }
-      const plan = nextPrescription(s, full, s.routines.find(r => r.id === s.active.routineId))
-      s.active.entries.push({ id: ex.id, target: { ...cfg }, plan, sets: applyPrescription(buildSets(s, full), plan), routineSource: null })
-      s.active.cur = s.active.entries.length - 1
-    }), null, S.routines.find(r => r.id === A.routineId)))} icon="plus">{t('Add exercise')}</Button>
+      const full = { ...cfg, id: ex.id, phase }
+      const plan = nextPrescription(s, full, policyRoutine)
+      insertPhaseEntry(s.active, { id: ex.id, phase, target: full, plan, sets: applyPrescription(buildSets(s, full), plan), routineSource: null })
+    }), null, policyRoutine))} icon="plus">{t('Add exercise')}</Button>
     <div style={{ height: 10 }} />
     {(() => {
       const exDone = A.entries.filter(e => e.sets.length && e.sets.every(s => s.done)).length
