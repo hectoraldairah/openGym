@@ -1,5 +1,10 @@
 // Spanish UI strings. Keys are the English source strings (see lib/i18n.js).
 export default {
+  'Exercise notes': 'Notas del ejercicio',
+  'Add exercise notes': 'Agregar notas del ejercicio',
+  'Notes saved': 'Notas guardadas',
+  'Notes removed': 'Notas eliminadas',
+  'Machine settings, technique cues, or reminders for next time…': 'Ajustes de máquina, indicaciones de técnica o recordatorios para la próxima sesión…',
   'legs': 'piernas', 'arms': 'brazos',
   'Confirm': 'Confirmar',
   'Cancel': 'Cancelar',

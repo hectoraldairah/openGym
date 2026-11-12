@@ -24,6 +24,7 @@ import { exerciseWeightUnit, convertWeight, displayWeight } from './lib/weight.j
 import { youtubeVideo } from './lib/youtube.js'
 import { workoutRecords } from './lib/records.js'
 import RecordCard from './components/RecordCard.jsx'
+import ExerciseNotes from './components/ExerciseNotes.jsx'
 import { searchExercises } from './lib/exercise-search.js'
 
 const S = () => useStore.getState().S
@@ -299,6 +300,7 @@ function ExerciseDetail({ ex, close }) {
       {(ex.sm || []).slice(0, 3).map((s, i) => <span key={i} className="tag">{t(s)}</span>)}
     </div>
     {ex.desc && <div className="exnote">{ex.desc}</div>}
+    <ExerciseNotes key={ex.id} exerciseId={ex.id} />
     {best > 0 && <div className="small row" style={{ marginBottom: 6, gap: 5 }}><Icon name="trophy" style={{ fontSize: 14, color: 'var(--yellow)' }} />{t('Best:')} <b className="accent">{fmtNum(best)} {st.unit}</b>{last ? ` · ${t('last')} ${fmtDate(last.d)}: ${last.sets.map(s => setLabel(ex.id, s, last.target)).join(', ')}` : ''}</div>}
     <Button variant="primary" icon="plus" style={{ margin: '10px 0 4px' }} onClick={() => addToRoutineSheet(ex)}>{t('Add to my plan')}</Button>
     {ex.custom && <div className="row" style={{ gap: 8, marginTop: 8 }}>
@@ -405,6 +407,7 @@ export function deleteCustomEx(ex, afterDelete) {
         // stamp the name into history entries so past workouts stay readable
         s.workouts.forEach(w => w.entries.forEach(e => { if (e.id === ex.id) e.n = ex.n }))
         delete s.exWeights[ex.id]
+        if (s.exNotes) delete s.exNotes[ex.id]
       })
       toast(t('Exercise deleted'))
       afterDelete && afterDelete()
@@ -541,6 +544,7 @@ function ExConfig({ ex, existing, onSave, onDelete, close, routine }) {
       <span className="tag">{ex.tg ? t(ex.tg) : bodyPartName(ex.bp)}</span><span className="tag">{t(ex.eq)}</span>
     </div>
     {ex.desc && <div className="exnote">{ex.desc}</div>}
+    <ExerciseNotes key={ex.id} exerciseId={ex.id} />
     {!cardio && <div style={{ marginBottom: 14 }}>
       <Segmented className="seg-range" value={mode} onChange={setMode}
         options={[{ value: 'reps', label: t('Reps') }, { value: 'time', label: t('Time') }]} />
