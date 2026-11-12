@@ -24,6 +24,7 @@ import { exerciseWeightUnit, convertWeight, displayWeight } from './lib/weight.j
 import { youtubeVideo } from './lib/youtube.js'
 import { workoutRecords } from './lib/records.js'
 import RecordCard from './components/RecordCard.jsx'
+import { searchExercises } from './lib/exercise-search.js'
 
 const S = () => useStore.getState().S
 const update = (...a) => useStore.getState().update(...a)
@@ -426,12 +427,10 @@ function ExercisePicker({ onPick, close }) {
   const [bp, setBp] = useState('')          // '' = all, '★' = chosen, else a body part
   const [eq, setEq] = useState('')          // '' = any equipment
   const [shown, setShown] = useState(50)
-  const ql = q.toLowerCase().trim()
   const all = allExercises(st)
-  let base = all.filter(e =>
-    (bp === '★' ? usage[e.id] : (!bp || e.bp === bp)) &&
-    (!ql || e.n.toLowerCase().includes(ql) || e.tg.includes(ql) || e.eq.includes(ql) || (e.desc || '').toLowerCase().includes(ql)))
+  let base = all.filter(e => bp === '★' ? usage[e.id] : (!bp || e.bp === bp))
   if (bp === '★') base = [...base].sort((a, b) => (usage[b.id] - usage[a.id]) || (a.n < b.n ? -1 : 1))
+  base = searchExercises(base, q)
   const eqOpts = equipmentOf(base)
   // Drop the equipment filter if the search narrowed it away, so you never hit a dead end.
   const eqOn = eqOpts.includes(eq) ? eq : ''
