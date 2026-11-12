@@ -7,7 +7,7 @@
 //   node scripts/check-locales.mjs
 //
 // The reference is the union of all locales, not one blessed file: a key added to a
-// single locale then flags the other ten instead of passing unnoticed.
+// single locale then flags the other locales instead of passing unnoticed.
 
 import { readdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -40,7 +40,7 @@ const union = [...seen.keys()]
 let failed = false
 for (const [lang, keys] of locales) {
   const missing = union.filter(k => !keys.has(k))
-  const orphans = union.filter(k => keys.has(k) && seen.get(k) === 1)
+  const orphans = locales.size > 1 ? union.filter(k => keys.has(k) && seen.get(k) === 1) : []
   if (missing.length || orphans.length) {
     failed = true
     console.error(`\n${lang}.js: ${keys.size}/${union.length} keys`)

@@ -25,6 +25,9 @@ import { youtubeVideo } from './lib/youtube.js'
 import { workoutRecords } from './lib/records.js'
 import RecordCard from './components/RecordCard.jsx'
 import ExerciseNotes from './components/ExerciseNotes.jsx'
+import ExerciseReplacement from './components/ExerciseReplacement.jsx'
+import { replacementConfig, replaceActiveExercise } from './lib/exercise-replacement.js'
+import WorkoutJsonImport from './components/WorkoutJsonImport.jsx'
 import { searchExercises } from './lib/exercise-search.js'
 
 const S = () => useStore.getState().S
@@ -468,6 +471,26 @@ function ExercisePicker({ onPick, close }) {
 }
 export const exercisePicker = onPick => ui().openSheet(close => <ExercisePicker onPick={onPick} close={close} />)
 
+export function replaceExerciseSheet(entryIdx) {
+  const active = S().active
+  const entry = active?.entries[entryIdx]
+  if (!entry || ui().work) return
+  const activeId = active.id, originalId = entry.id
+  const stillCurrent = () => S().active?.id === activeId && S().active.entries[entryIdx]?.id === originalId && !ui().work
+  ui().openSheet(close => <ExerciseReplacement entryIdx={entryIdx} close={close} onChoose={(exercise, updateRoutine) => {
+    if (!stillCurrent()) { toast(t('The workout changed. Choose the exercise again.')); return }
+    const routine = S().routines.find(r => r.id === S().active.routineId)
+    exConfigSheet(exercise, replacementConfig(S(), entryIdx, exercise), config => {
+      if (!stillCurrent()) { toast(t('The workout changed. Choose the exercise again.')); return }
+      try {
+        update(s => replaceActiveExercise(s, entryIdx, exercise, config, { updateRoutine, activeId, originalId }))
+        ui().stopRest()
+        toast(t(updateRoutine ? 'Exercise replaced in this workout and routine' : 'Exercise replaced for today'))
+      } catch (e) { toast(e.message) }
+    }, null, routine)
+  }} />)
+}
+
 /* ============================ exercise config ============================ */
 // Progression settings for one exercise (issue #17). Shown inside the config sheet because
 // "how does this lift go up" belongs next to sets and reps, not in a separate screen. Left
@@ -777,6 +800,7 @@ function WorkoutDetail({ w, close }) {
   </>
 }
 export const workoutDetailSheet = w => ui().openSheet(close => <WorkoutDetail w={w} close={close} />)
+export const workoutJsonImportSheet = () => ui().openSheet(close => <WorkoutJsonImport close={close} />)
 
 /* ============================ calendar ============================ */
 function Calendar({ start, close }) {
@@ -843,9 +867,9 @@ export function beginWorkout(routineId, bw) {
   // The prescription is applied as the session is built, so you walk up to the bar with the
   // right weight already on the screen instead of being told about it afterwards. `plan` is
   // kept on the entry purely so the workout can explain the number it chose.
-  const entries = (r ? r.ex : []).map(cfg => {
+  const entries = (r ? r.ex : []).map((cfg, index) => {
     const plan = nextPrescription(st, cfg, r)
-    return { id: cfg.id, sg: cfg.sg, target: { ...cfg }, plan, sets: applyPrescription(buildSets(st, cfg), plan) }
+    return { id: cfg.id, sg: cfg.sg, target: { ...cfg }, plan, sets: applyPrescription(buildSets(st, cfg), plan), routineSource: { index, config: { ...cfg } } }
   })
   update(s => {
     s.active = { id: uid(), d: todayISO(), start: Date.now(), routineId, name: r ? r.name : t('Freestyle'), bw: bw || null, cur: 0, entries }

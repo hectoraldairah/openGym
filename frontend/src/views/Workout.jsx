@@ -10,7 +10,7 @@ import { t } from '../lib/i18n.js'
 import { api } from '../lib/api.js'
 import Media from '../components/Media.jsx'
 import ExerciseNotes from '../components/ExerciseNotes.jsx'
-import { startFlow, exercisePicker, exConfigSheet, exerciseDetailSheet, topWeightSheet, finishWorkout, workoutCompleteSheet, confirmSheet } from '../sheets.jsx'
+import { startFlow, exercisePicker, exConfigSheet, exerciseDetailSheet, replaceExerciseSheet, topWeightSheet, finishWorkout, workoutCompleteSheet, confirmSheet } from '../sheets.jsx'
 import Icon from '../components/Icon.jsx'
 import { Button, Check, NumberField, Segmented } from '../components/ui.jsx'
 import { exerciseWeightUnit, convertWeight, displayWeight } from '../lib/weight.js'
@@ -162,7 +162,8 @@ function ExerciseBlock({ entryIdx, compact, onToggle, onField, onAddSet, onRemov
         <Button size="sm" icon="plus" onClick={onAddSet}>{t('Add set')}</Button>
       </div>
     </div>
-    <div style={{ marginTop: 8 }}>
+    <div className="row" style={{ marginTop: 8, gap: 8, flexWrap: 'wrap' }}>
+      <Button variant="ghost" size="sm" icon="shuffle" disabled={!!working || !entry.sets.some(s => !s.done)} onClick={() => replaceExerciseSheet(entryIdx)}>{t('Replace exercise')}</Button>
       <Button variant="ghost" size="sm" icon="trash" disabled={!!working} onClick={onRemoveExercise}>{t('Remove exercise')}</Button>
     </div>
   </>
@@ -302,7 +303,7 @@ function ActiveWorkout() {
       {isSuperset ? (
         <div className="ss-card">
           <div className="ss-hd"><Icon name="link" />{t('Superset · do these back-to-back, rest after both')}</div>
-          {unit.map((idx, k) => <div key={idx} className="ss-ex">
+          {unit.map((idx, k) => <div key={`${idx}:${A.entries[idx].id}`} className="ss-ex">
             {k > 0 && <div className="ss-amp">+</div>}
             <ExerciseBlock entryIdx={idx} compact
               onRemoveExercise={() => removeExercise(idx)}
@@ -310,7 +311,7 @@ function ActiveWorkout() {
           </div>)}
         </div>
       ) : (
-        <ExerciseBlock entryIdx={cur} onRemoveExercise={() => removeExercise(cur)} onToggle={i => toggle(cur, i)} onField={(i, f, v) => setField(cur, i, f, v)} onAddSet={() => addSet(cur)} onRemoveSet={() => removeSet(cur)} onStartTimed={i => startTimed(cur, i)} />
+        <ExerciseBlock key={`${cur}:${A.entries[cur].id}`} entryIdx={cur} onRemoveExercise={() => removeExercise(cur)} onToggle={i => toggle(cur, i)} onField={(i, f, v) => setField(cur, i, f, v)} onAddSet={() => addSet(cur)} onRemoveSet={() => removeSet(cur)} onStartTimed={i => startTimed(cur, i)} />
       )}
     </> : <div className="empty"><div className="ico"><Icon name="shuffle" /></div>{t('Freestyle workout — add your first exercise.')}</div>}
 
@@ -323,7 +324,7 @@ function ActiveWorkout() {
     <Button onClick={() => exercisePicker(ex => exConfigSheet(ex, null, cfg => update(s => {
       const full = { ...cfg, id: ex.id }
       const plan = nextPrescription(s, full, s.routines.find(r => r.id === s.active.routineId))
-      s.active.entries.push({ id: ex.id, target: { ...cfg }, plan, sets: applyPrescription(buildSets(s, full), plan) })
+      s.active.entries.push({ id: ex.id, target: { ...cfg }, plan, sets: applyPrescription(buildSets(s, full), plan), routineSource: null })
       s.active.cur = s.active.entries.length - 1
     }), null, S.routines.find(r => r.id === A.routineId)))} icon="plus">{t('Add exercise')}</Button>
     <div style={{ height: 10 }} />

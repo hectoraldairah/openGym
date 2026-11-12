@@ -10,7 +10,14 @@ import { youtubeVideo } from '../lib/youtube.js'
 // `minimizable` (workout view) adds a persistent minimize/expand control so the animation stops
 // eating the screen; the chosen size is saved to settings and carries across exercises and
 // future workouts (issue #12).
-export default function Media({ ex, id, compact, minimizable }) {
+export default function Media(props) {
+  const { ex } = props
+  // Recreate the player whenever its exercise or media changes, including in sheets
+  // that reuse a component slot. This also resets paused state and stops old videos.
+  return <ExerciseMedia key={JSON.stringify([ex.id, ex.img, ex.gif, ex.videoUrl])} {...props} />
+}
+
+function ExerciseMedia({ ex, id, compact, minimizable }) {
   const [playing, setPlaying] = useState(true)
   const gifSize = useStore(s => s.S.gifSize)
   const update = useStore(s => s.update)
@@ -19,7 +26,7 @@ export default function Media({ ex, id, compact, minimizable }) {
   const mini = minimizable && gifSize === 'mini'
   const toggleSize = e => { e.stopPropagation(); update(s => { s.gifSize = mini ? 'full' : 'mini' }) }
   if (video) return <div className="exvideo" id={id}>
-    {!mini && <iframe key={ex.videoUrl} src={`https://www.youtube-nocookie.com/embed/${video.id}?start=${video.start}`}
+    {!mini && <iframe key={`${ex.id}:${video.id}:${video.start}`} src={`https://www.youtube-nocookie.com/embed/${video.id}?start=${video.start}`}
       title={ex.n} loading="lazy" allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowFullScreen
       referrerPolicy="strict-origin-when-cross-origin" />}
     <div className="row between" style={{ padding: 8, gap: 8 }}>
@@ -29,7 +36,7 @@ export default function Media({ ex, id, compact, minimizable }) {
   </div>
   return (
     <div className={'exmedia' + (compact ? ' compact' : '') + (mini ? ' mini' : '')} id={id} onClick={() => setPlaying(p => !p)}>
-      <img decoding="async" src={playing ? gifSrc(ex) : imgSrc(ex)} alt={ex.n} />
+      <img key={playing ? gifSrc(ex) : imgSrc(ex)} decoding="async" src={playing ? gifSrc(ex) : imgSrc(ex)} alt={ex.n} />
       {minimizable && (
         <button className="giftoggle" onClick={toggleSize}>
           <Icon name={mini ? 'expand' : 'minimize'} />{mini ? t('Expand') : t('Minimize')}
@@ -46,5 +53,5 @@ export default function Media({ ex, id, compact, minimizable }) {
 
 export function Thumb({ ex }) {
   if (!ex.img) return <div className="thumb thumb-x"><Icon name="dumbbell" /></div>
-  return <img className="thumb" loading="lazy" decoding="async" src={imgSrc(ex)} alt="" />
+  return <img key={`${ex.id}:${imgSrc(ex)}`} className="thumb" loading="lazy" decoding="async" src={imgSrc(ex)} alt="" />
 }
