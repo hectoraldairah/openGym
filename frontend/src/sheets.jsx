@@ -22,12 +22,14 @@ import { policyFor, defaultIncrement, POLICIES_FOR, POLICY_NAME, POLICY_DESC, MA
 import { MOBILE, shareExport } from './lib/mobile.js'
 import { exerciseWeightUnit, convertWeight, displayWeight } from './lib/weight.js'
 import { youtubeVideo } from './lib/youtube.js'
-import { workoutRecords } from './lib/records.js'
-import RecordCard from './components/RecordCard.jsx'
+import { newWorkoutRecords, RECORD_NAME } from './lib/records.js'
+import { useRecordConfetti } from './lib/useRecordConfetti.js'
+import { recordMeasure } from './lib/pr-share.js'
 import ExerciseNotes from './components/ExerciseNotes.jsx'
 import ExerciseReplacement from './components/ExerciseReplacement.jsx'
 import { replacementConfig, replaceActiveExercise } from './lib/exercise-replacement.js'
 import WorkoutJsonImport from './components/WorkoutJsonImport.jsx'
+import PRShareCard from './components/PRShareCard.jsx'
 import { searchExercises } from './lib/exercise-search.js'
 import { routineExercises, routineSections, phaseExercises, phaseOf, PHASE_NAME } from './lib/routine-sections.js'
 import { routineWorkoutEntries } from './lib/routine-workout.js'
@@ -812,6 +814,8 @@ function WorkoutDetail({ w, close }) {
 }
 export const workoutDetailSheet = w => ui().openSheet(close => <WorkoutDetail w={w} close={close} />)
 export const workoutJsonImportSheet = () => ui().openSheet(close => <WorkoutJsonImport close={close} />)
+export const prShareSheet = record => ui().openSheet(close => <PRShareCard record={record} close={close}
+  onWorkout={workout => { close(); workoutDetailSheet(workout) }} />)
 
 /* ============================ calendar ============================ */
 function Calendar({ start, close }) {
@@ -973,6 +977,10 @@ export const workoutCompleteSheet = () => ui().openSheet(close => <WorkoutComple
 
 function FinishSummary({ w, records, close }) {
   const st = useStore(s => s.S)
+  const [selected, setSelected] = useState(records[0] ? `${records[0].id}:${records[0].kind}` : '')
+  const celebration = useRef(null)
+  useRecordConfetti(celebration, records.length > 0)
+  const current = records.find(record => `${record.id}:${record.kind}` === selected) || records[0]
   return <div style={{ textAlign: 'center', padding: '8px 0' }}>
     <div style={{ fontSize: 44, display: 'flex', justifyContent: 'center', color: 'var(--acc)' }}><Icon name="trophy" /></div>
     <h3 style={{ margin: '8px 0' }}>{t('Workout complete!')}</h3>
@@ -982,8 +990,16 @@ function FinishSummary({ w, records, close }) {
       <div className="tile"><div className="l">{t('Sets')}</div><div className="v" style={{ fontSize: '1.1rem' }}>{setsDone(w)}</div></div>
       <div className="tile"><div className="l">{t('PRs')}</div><div className="v" style={{ fontSize: 20 }}>{records.length || '—'}</div></div>
     </div>
-    {records.length > 0 && <div className="record-list">
-      {records.map((record, index) => <RecordCard key={record.id} record={record} state={st} index={index} />)}
+    {current && <div ref={celebration} style={{ textAlign: 'left', margin: '16px 0' }}>
+      {records.length > 1 && <div className="sect-b" style={{ marginBottom: 12 }}>
+        <SelectRow title={t('Choose a record')} sheetTitle={t('New records in this workout')} value={selected} onChange={setSelected}
+          options={records.map(record => ({
+            value: `${record.id}:${record.kind}`,
+            label: (EXIDX[record.id]?.n || record.name || record.id) + ' · ' + t(RECORD_NAME[record.kind]),
+            subtitle: recordMeasure(record, st)
+          }))} />
+      </div>}
+      <PRShareCard key={`${current.id}:${current.kind}`} record={current} embedded onWorkout={workout => workoutDetailSheet(workout)} />
     </div>}
     <h4 className="sec" style={{ textAlign: 'left' }}>{t('What you just trained')}</h4>
     <BodyMap load={loadOfWorkouts([w])} body={st.body} />
@@ -1004,17 +1020,17 @@ function doFinishWorkout() {
   const st = S()
   const A = st.active
   if (!A) return
-  const records = workoutRecords(st, A)
-  const prs = records.filter(r => r.kind === 'weight').map(r => r.id)
   const w = {
     id: A.id, d: A.d, start: A.start, end: Date.now(), routineId: A.routineId, name: A.name, bw: A.bw,
     // `target` (what the session prescribed) is kept alongside the sets: without it a
     // finished workout cannot say whether it hit its reps, and a timed session reads back
     // as "0 reps". It is what the progression engine works from.
     entries: A.entries.map(e => ({ id: e.id, phase: phaseOf(e), sets: e.sets, topW: e.topW || null, target: e.target || null })).filter(e => e.sets.some(s => s.done)),
-    prs
+    prs: []
   }
   w.vol = workoutVolume(w)
+  const records = newWorkoutRecords(st, w)
+  w.prs = records.filter(record => record.kind === 'weight').map(record => record.id)
   update(s => {
     w.entries.forEach(e => {
       if (phaseOf(e) !== 'main') return
@@ -1026,5 +1042,5 @@ function doFinishWorkout() {
   })
   useUI.getState().stopRest()
   beep(snd(), 880, 0.15); beep(snd(), 1100, 0.15, 0.18); beep(snd(), 1320, 0.3, 0.36)
-  ui().openSheet(close => <FinishSummary w={w} records={records} close={close} />, { kind: 'center', locked: true })
+  ui().openSheet(close => <FinishSummary w={w} records={records} close={close} />, { kind: records.length ? 'sheet' : 'center', locked: true })
 }

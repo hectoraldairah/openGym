@@ -66,3 +66,16 @@ export async function shareExport(json, filename) {
   const w = await Filesystem.writeFile({ path: filename, directory: Directory.Cache, data: json, encoding: Encoding.UTF8 })
   await Share.share({ title: filename, url: w.uri })
 }
+
+export async function shareImage(blob, filename, title) {
+  const data = await new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result).split(',')[1])
+    reader.onerror = () => reject(reader.error || new Error('Unable to read image'))
+    reader.readAsDataURL(blob)
+  })
+  const { Filesystem, Directory } = await import('@capacitor/filesystem')
+  const { Share } = await import('@capacitor/share')
+  const result = await Filesystem.writeFile({ path: filename, directory: Directory.Cache, data })
+  await Share.share({ title, files: [result.uri] })
+}
